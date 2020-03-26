@@ -15,7 +15,7 @@ const User = new mongoose.Schema({
   about: {
     type: String
   },
-  profile_pic: {
+  avatar: {
     type: String
   },
   online: {
