@@ -13,5 +13,4 @@ router.get("/get_chat", (req, res) => {
     res.json(data);
   });
 });
-
 module.exports = router;
