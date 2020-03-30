@@ -65,19 +65,11 @@ router.post("/update_user", (req, res) => {
     });
 });
 
-router.get("/login", (req, res) => {
-  console.log(req.query, "login User");
-  User.findOne({ contact_no: req.query.contact_no }, (err, data) => {
-    if (err) {
-      console.log("err", err);
-      return;
-    }
-    if (data) {
-      res.json(data);
-    } else {
-      res.json("User Already Exists");
-    }
-  });
+router.post("/login", (req, res) => {
+  console.log(req.body, "login User");
+  User.findOne({ contact_no: req.body.contact_no })
+    .then(s => res.json(s))
+    .catch(e => res.status(500).json(e));
 });
 
 router.get("/get_user", (req, res) => {
