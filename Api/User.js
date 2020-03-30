@@ -65,11 +65,24 @@ router.post("/update_user", (req, res) => {
     });
 });
 
-router.post("/login", (req, res) => {
-  console.log(req.body, "login User");
-  User.findOne({ contact_no: req.body.contact_no })
-    .then(s => res.json(s))
-    .catch(e => res.status(500).json(e));
+router.get("/login", (req, res) => {
+  let number = `+${req.query.contact_no}`;
+  let splitNumber = number.split(" ");
+  let mergeNumber = splitNumber[0] + splitNumber[1]
+
+
+  User.findOne({ contact_no: mergeNumber }, (err, data) => {
+    console.log(mergeNumber, "login User");
+    if (err) {
+      console.log("err", err);
+      return;
+    }
+    if (data) {
+      res.json(data);
+    } else {
+      res.json("User Has Not Registered!");
+    }
+  });
 });
 
 router.get("/get_user", (req, res) => {
