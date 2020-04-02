@@ -71,26 +71,26 @@ router.get("/login", (req, res) => {
   let splitNumber = number.split(" ");
   let mergeNumber = splitNumber[0] + splitNumber[1];
   if (req.query.contact_exist) {
-      let num = ``;
+    let num = ``;
 
     let splitNumberDash = number.split("-");
     splitNumberDash.map(v => {
       num += v;
     });
     let splitNumberPlusZero = num.split("+0");
-    num = ``
+    num = ``;
     splitNumberPlusZero.map(v => {
       num += v;
     });
     let splitNumberPlus = num.split("+");
 
-    num = ``
+    num = ``;
     splitNumberPlus.map(v => {
       num += v;
     });
     let splitNumberPlus92 = num.split("+92");
 
-    num = ``
+    num = ``;
     splitNumberPlus92.map(v => {
       num += v;
     });
@@ -107,7 +107,7 @@ router.get("/login", (req, res) => {
   }
 
   User.findOne({ contact_no: mergeNumber }, (err, data) => {
-    if(data) console.log(data, mergeNumber, "login");
+    if (data) console.log(data, mergeNumber, "login");
     if (err) {
       console.log("err", err);
       return;
@@ -121,8 +121,7 @@ router.get("/login", (req, res) => {
 });
 
 router.get("/get_user", (req, res) => {
-  console.log(req.query, "get User");
-  User.findOne({ _id: req.query._id }, (err, data) => {
+  User.find((err, data) => {
     if (err) {
       console.log("err", err);
       return;
@@ -131,6 +130,16 @@ router.get("/get_user", (req, res) => {
   });
 });
 
+router.get("/contact_list", (req, res) => {
+  console.log("req.query =>", req.query);
+
+  User.find({ contact_no: req.query.contact_no })
+    .then(success => {
+      console.log(success, "while");
+      res.json(success);
+    })
+    .catch(err => res.send(400).json(err));
+});
 
 router.get("/get_all_user", (req, res) => {
   console.log(req.query, "get User");
