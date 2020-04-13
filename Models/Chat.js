@@ -1,11 +1,14 @@
 const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
+
 const Chat = new mongoose.Schema({
   text: {
     type: String,
-    required: true
+    // required: true
   },
   user: {
-    type: String,
+    type: Schema.Types.ObjectId,
+    ref: "users",
     required: true
   },
   status: {
@@ -21,12 +24,13 @@ const Chat = new mongoose.Schema({
     type: String
   },
   chatroom_id: {
-    type: String
+    type: Schema.Types.ObjectId,
+    ref: "chatrooms"
   },
   createdAt: {
-    type: Number,
-    default: new Date().getTime()
+    type: String,
+    // default: new Date()
   }
 });
 
-module.exports = mongoose.model("chats", Chat);
+module.exports =  mongoose.model("chats", Chat);

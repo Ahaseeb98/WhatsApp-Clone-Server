@@ -3,10 +3,18 @@ var socket = require("socket.io");
 const db = require("./Config");
 const fileUpload = require("express-fileupload");
 const bodyParser = require("body-parser");
-
+const {
+  addUser,
+  removeUser,
+  getUser,
+  getUsersInRoom,
+} = require("./socketUser");
 const cors = require("cors");
+const User = require("./Models/User");
+const Chat = require("./Models/Chat");
+const ChatRoom = require("./Models/ChatRoom");
 
-var allowCrossDomain = function(req, res, next) {
+var allowCrossDomain = function (req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.header(
@@ -29,8 +37,8 @@ app.use(
   fileUpload({
     createParentPath: true,
     limits: {
-      fileSize: 10 * 1024 * 1024 * 1024 //2MB max file(s) size
-    }
+      fileSize: 10 * 1024 * 1024 * 1024, //2MB max file(s) size
+    },
   })
 );
 app.use(bodyParser.json());
@@ -39,9 +47,9 @@ app.use(cors());
 
 db.connection
   .once("open", () => console.log("connected to db"))
-  .on("error", err => console.log("error connecting db -->", err));
+  .on("error", (err) => console.log("error connecting db -->", err.message));
 
-var server = app.listen(8000, function() {
+var server = app.listen(process.env.PORT || 8000, function () {
   console.log("listening for requests on port 8000");
 });
 
@@ -50,73 +58,131 @@ app.use(express.static("public"));
 
 var io = socket(server);
 
-let chat_arr = [
-  {
-    _id: 1,
-    text: "Hello developer",
-    createdAt: new Date(),
-    image: "https://placeimg.com/140/140/any",
-    user: {
-      _id: 2,
-      name: "React Native",
-      avatar: "https://placeimg.com/140/140/any"
-    }
-  },
-  {
-    _id: 2,
-    text: "Hello ",
-    createdAt: new Date(),
-    user: {
-      _id: 1,
-      name: "React Native",
-      avatar: "https://placeimg.com/140/140/any"
-    }
-  },
-  {
-    _id: 3,
-    text: "Hello developer",
-    createdAt: new Date(),
-    user: {
-      _id: 2,
-      name: "React Native",
-      avatar: "https://placeimg.com/140/140/any"
-    }
-  }
-];
+let chat_arr = [];
+var io = socket(server);
 
-io.on("connection", socket => {
+io.on("connection", (socket) => {
   console.log(
     "made socket connection",
     socket.id,
     socket.handshake.query.userId
   );
 
-  socket.on("getChat/123", function() {
-    io.sockets.emit("getChat/123", chat_arr);
+  User.findOne({ _id: socket.handshake.query.userId }, (err, data) => {
+    if (data) {
+      data.status = "Online";
+      data.save((user) => {
+        io.sockets.emit("user" + socket.handshake.query.userId, data);
+      });
+    }
+  });
+  socket.on("join", ({ name, room }, callback) => {
+    const { error, user } = addUser({ id: socket.client.id, name, room });
+    if (error) return callback({ error: err });
+    socket.join(user.room);
+    io.to(user.room).emit("roomData", {
+      room: user.room,
+      users: getUsersInRoom(user.room),
+    });
+    callback();
+  });
+  socket.on("messageRead", (data, callback) => {
+    const user = getUser(socket.id);
+    if (!user) return;
+    // console.log(data, "msdRead?????")
+    Chat.findOne({ _id: data }).exec(function (err, msg) {
+      if (err) {
+        console.log("err", err);
+        return;
+      }
+      msg.status = "Recieved";
+      msg.save().then(() => {
+        console.log(data, "update");
+        io.to(user.room).emit("messageRead", data);
+      });
+    });
+
+    // callback();
+  });
+  socket.on("sendMessage", (message, callback) => {
+    const user = getUser(socket.id);
+    if (!user) return;
+    message.createdAt = new Date();
+    let chat = new Chat(message);
+    chat
+      .save()
+      .then((data) => {
+        Chat.findOne({ _id: data._id })
+          .populate("user")
+          .exec(function (err, msg) {
+            if (err) {
+              console.log("err", err);
+              return;
+            }
+            // console.log(msg);
+            ChatRoom.findOne({ _id: msg.chatroom_id }, (error, chatRoom) => {
+              if (error) {
+                console.log("error", error);
+                return;
+              }
+              // console.log(chatRoom, msg.chatRoom_id)
+              chatRoom.updatedAt = msg.createdAt;
+              chatRoom.save(() => {
+                // io.to(user.room).emit("message", msg);
+                io.to(user.room).emit("message", msg);
+              });
+            });
+          });
+      })
+      .catch((err) => {
+        console.log("err", err);
+      });
+    // callback();
   });
 
-  socket.on("addChat/123", function(data) {
-    // console.log(data)
-    chat_arr.push(data[0]);
-    io.sockets.emit("getChat/123", data);
+  socket.on("get_rooms" + socket.handshake.query.userId, (chatRooms) => {
+    console.log("desus");
+    ChatRoom.find({
+      $and: [
+        {
+          $or: [
+            { client: socket.handshake.query.userId },
+            { counsalor: socket.handshake.query.userId },
+          ],
+        },
+      ],
+    })
+      .sort("-updatedAt")
+      .populate("client counsalor") // only return the Persons name
+      .exec(function (err, data) {
+        socket.emit("get_rooms" + socket.handshake.query.userId, data.data);
+      });
   });
+  socket.on("userBlocked", (data) => {
+    console.log("userBlocked" + data);
+    io.sockets.emit("userBlocked" + data, data);
+  });
+  socket.on("disconnect", () => {
+    removeUser(socket.id);
 
-  socket.on("disconnect", function() {
-    console.log(
-      "disconnected",
-      "disconnected",
-      socket.id,
-      socket.handshake.query.userId
-    );
-    io.sockets.emit(
-      "disconnected",
-      "disconnected",
-      socket.id,
-      socket.handshake.query.userId
-    );
+    User.findOne({ _id: socket.handshake.query.userId }, (err, data) => {
+      if (data) {
+        data.status = "Offline";
+        data.last_online = new Date();
+        data.save((user) => {
+          console.log(data);
+          io.sockets.emit("user" + socket.handshake.query.userId, data);
+        });
+      }
+    });
+    // io.sockets.emit(
+    //   "disconnected",
+    //   "disconnected",
+    //   socket.id,
+    //   socket.handshake.query.userId
+    // );
   });
 });
-
 // Api / Backend work below this point
 app.use("/user", require("./Api/User"));
 app.use("/chat", require("./Api/Chat"));
@@ -127,17 +193,17 @@ app.post("/add_images", (req, res) => {
     console.log("err");
     return res.status(400).json({ msg: "No file uploaded" });
   }
-  const file = req.files["images[]"];
-  let imageArr = [];
+  const file = req.files["images"];
+  // let imageArr = [];
   // file.map((v, i) => {
-  //   let name = new Date().getTime() + i;
-  //   v.mv(`${__dirname}/public/chat_img/${name}`, err => {
-  //     if (err) {
-  //       console.error(err);
-  //       return res.status(500).send("err", err);
-  //     }
-  //   });
-  //   imageArr.push({ path: "chat_img/" + name });
+    let name = new Date().getTime();
+    file.mv(`${__dirname}/public/chat_img/${name}.png`, err => {
+      if (err) {
+        console.error(err);
+        return res.status(500).send("err", err);
+      }
+    });
+    // imageArr.push({ path: "chat_img/" + name });
   // });
-  res.json(imageArr);
+  res.json({ path: "chat_img/" + name +".png" });
 });
