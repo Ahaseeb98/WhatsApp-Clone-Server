@@ -79,13 +79,13 @@ router.get("/login", (req, res) => {
     });
     let splitNumberPlusZero = num.split("+0");
     num = ``;
-    splitNumberPlusZero.map((v) => {
+    splitNumberPlusZero.map(v => {
       num += v;
     });
     let splitNumberPlus = num.split("+");
 
     num = ``;
-    splitNumberPlus.map((v) => {
+    splitNumberPlus.map(v => {
       num += v;
     });
     let splitNumberPlus92 = num.split("+92");
@@ -121,8 +121,7 @@ router.get("/login", (req, res) => {
 });
 
 router.get("/get_user", (req, res) => {
-  console.log(req.query, "get User");
-  User.findOne({ _id: req.query._id }, (err, data) => {
+  User.find((err, data) => {
     if (err) {
       console.log("err", err);
       return;
